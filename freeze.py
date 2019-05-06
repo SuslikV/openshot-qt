@@ -356,9 +356,22 @@ try:
 except NameError:
     pass
 
+print("sys.path")
+print(sys.path)
+
+infoVersion = info.VERSION
+
+# Override version for win32 (cx_Freeze 5.1.1 allow only int numbers: a.b.c.d)
+if sys.platform == "win32":
+    # for example, infoVersion = "2.4.4-dev1"
+    import re
+    infoVersion = infoVersion.replace("-", ".")
+    infoVersion = re.sub("[^0-9.]", "", infoVersion)
+    # here infoVersion = "2.4.4.1"
+
 # Create distutils setup object
 setup(name=info.PRODUCT_NAME,
-      version=info.VERSION,
+      version=infoVersion,
       description=info.DESCRIPTION,
       author=info.COMPANY_NAME,
       options=build_options,
