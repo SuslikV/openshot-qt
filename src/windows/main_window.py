@@ -32,6 +32,7 @@ import sys
 import platform
 import shutil
 import webbrowser
+import logging
 from operator import itemgetter
 from uuid import uuid4
 from copy import deepcopy
@@ -2038,6 +2039,11 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         # Window state and geometry (also toolbar and dock locations)
         if s.get('window_state_v2'): self.restoreState(qt_types.str_to_bytes(s.get('window_state_v2')))
         if s.get('window_geometry_v2'): self.restoreGeometry(qt_types.str_to_bytes(s.get('window_geometry_v2')))
+
+        # Log only errors after startup
+        if not s.get('debug-mode'):
+            log.info("Changing log level to the 'ERROR'")
+            log.setLevel(logging.ERROR)
 
         # Load Recent Projects
         self.load_recent_menu()
