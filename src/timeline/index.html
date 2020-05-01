@@ -67,6 +67,8 @@
 				<div class="track_top">
 					<div tl-clip-menu class="track_menu" ng-mousedown="ShowTrackMenu(layer.id)"></div>
 					<span class="track_label">{{GetTrackName(layer.label, project.layers.length - $index)}}</span><span ng-show="layer.lock" class="track_lock"></span>
+					<span ng-if="layer.skip_audio" class="track_mute" ng-mousedown="ShowTrackMenu(layer.id)"></span>
+					<span ng-if="layer.skip_video" class="track_show_off" ng-mousedown="ShowTrackMenu(layer.id)"></span>
 				</div>
 			</div>
 			<br>
