@@ -2470,6 +2470,9 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         # Add Video Preview toolbar
         self.videoToolbar = QToolBar("Video Toolbar")
 
+        # Add left spacer
+        self.videoToolbar.addWidget(self.spacerLeft)
+
         # Playback controls
         self.videoToolbar.addAction(self.actionPlay)
         self.videoToolbar.addWidget(self.preview_speed)
@@ -2479,7 +2482,7 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         self.videoToolbar.addAction(self.actionSeekNextFrame)
         self.actionPlay.setCheckable(True)
 
-        # Add right spacer
+        # Add center spacer
         spacer = QWidget(self)
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.videoToolbar.addWidget(spacer)
@@ -2487,6 +2490,9 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         # Other controls (right-aligned)
         self.videoToolbar.addWidget(self.timelines_frame)
         self.videoToolbar.addAction(self.actionSaveFrame)
+
+        # Add right spacer
+        self.videoToolbar.addWidget(self.spacerRight)
 
         self.tabVideo.layout().addWidget(self.videoToolbar)
 
@@ -2531,6 +2537,12 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
 
         # Add timeline toolbar to web frame
         self.frameWeb.addWidget(self.timelineToolbar)
+
+    def setPreviewSpacerWidth(self, size):
+        if self.videoPreview.previewAreaSize:
+            dist = (size.width() - self.videoPreview.previewAreaSize.width()) / 2
+            self.spacerLeft.setMinimumWidth(dist)
+            self.spacerRight.setMinimumWidth(dist)
 
     def clearSelections(self):
         """Clear all selection containers"""
@@ -2726,6 +2738,12 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         self.timelines_frame.setRange(1, 99999999)
         self.timelines_frame.setDecimals(0)
         self.timelines_frame.setAlignment(Qt.AlignRight)
+
+        # Adjustable size Preview tool bar spacers
+        self.spacerLeft = QWidget(self)
+        self.spacerRight = QWidget(self)
+        self.spacerLeft.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        self.spacerRight.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
 
         # Setup toolbars that aren't on main window, set initial state of items, etc
         self.setup_toolbars()
@@ -2970,6 +2988,9 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         # Preview Speed connections
         self.preview_speed.valueChanged.connect(self.setPreviewSpeed)
         self.preview_speed.editingFinished.connect(self.updPreviewSpeed)
+
+        # Preview widget was changed - adjust UI controls position
+        self.MaxSizeChanged.connect(self.setPreviewSpacerWidth)
 
         # Refresh frame
         QTimer.singleShot(100, self.refreshFrameSignal.emit)
