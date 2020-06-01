@@ -57,6 +57,7 @@ img {
 .track_menu { cursor: pointer; float:left;margin-top:4px;margin-left:4px;margin-right:4px;width:12px;height:12px;background-image: url(../images/menu.png);}
 .track_menu:hover { background-image: url(../images/menu_hover.png); }
 .track_lock { float: left; background-image: url(../images/lock.png); width:14px;height:14px; margin-top: 2px; }
+.track_lock:hover { background-image: url(../images/lock_hover.png); }
 .track_mute { float: left; background-image: url(../images/speaker_muted.png); width:14px;height:14px; margin-top: 2px; }
 .track_mute:hover { background-image: url(../images/speaker_muted_hover.png); }
 .track_show_off { float: left; background-image: url(../images/show_off.png); width:14px;height:14px; margin-top: 2px; }
