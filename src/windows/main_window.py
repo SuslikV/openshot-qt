@@ -53,6 +53,7 @@ from classes.version import *
 from classes.conversion import zoomToSeconds, secondsToZoom
 from classes.thumbnail import httpThumbnailServerThread
 from images import openshot_rc
+from windows.curve_editor import CurveEditor
 from windows.models.files_model import FilesModel
 from windows.views.files_treeview import FilesTreeView
 from windows.views.files_listview import FilesListView
@@ -72,7 +73,6 @@ from classes.exporters.edl import export_edl
 from classes.exporters.final_cut_pro import export_xml
 from classes.importers.edl import import_edl
 from classes.importers.final_cut_pro import import_xml
-
 
 class MainWindow(QMainWindow, updates.UpdateWatcher):
     """ This class contains the logic for the main window widget """
@@ -102,9 +102,13 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
     OpenProjectSignal = pyqtSignal(str)
     ThumbnailUpdated = pyqtSignal(str)
     FileUpdated = pyqtSignal(str)
+    ItemSelected = pyqtSignal('QStandardItem')
 
     # Docks are closable, movable and floatable
     docks_frozen = False
+
+    # make Curve Editor not running by default
+    curve_editor_enable = False
 
     # Save window settings on close
     def closeEvent(self, event):
@@ -539,6 +543,12 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
                 # Load recent projects again
                 self.load_recent_menu()
 
+                # Update Streams skipping
+                self.upd_track_skipping()
+
+                # Reset frame navigation
+                self.timelines_frame.setValue(1)
+
                 log.info("Loaded project {}".format(file_path))
             else:
                 log.info("File not found at {}".format(file_path))
@@ -933,7 +943,7 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         if self.actionPlay.isChecked():
             ui_util.setup_icon(self, self.actionPlay, "actionPlay", "media-playback-pause")
             self.PlaySignal.emit(timeline_length_int)
-
+            self.updPreviewSpeed()
         else:
             ui_util.setup_icon(self, self.actionPlay, "actionPlay")  # to default
             self.PauseSignal.emit()
@@ -967,10 +977,27 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         """Handle the pause signal, by refreshing the properties dialog"""
         self.propertyTableView.select_frame(self.preview_thread.player.Position())
 
+    def movePlayheadFrames(self, position_frames):
+        """Start update playhead position with small delay to not trigger on each entered digit"""
+        if self.navigateToFrame == position_frames:
+            self.navigateToFrame_timer.stop()
+        else:
+            self.navigateToFrame = position_frames
+            self.navigateToFrame_timer.start()
+
+    def navigateToFrameTimeout(self):
+        # Skip navigation if already in place
+        if self.navigateToFrame == self.preview_thread.player.Position():
+            return
+        self.movePlayhead(self.navigateToFrame)
+        self.previewFrame(self.navigateToFrame)
+
     def movePlayhead(self, position_frames):
         """Update playhead position"""
         # Notify preview thread
         self.timeline.movePlayhead(position_frames)
+        self.navigateToFrame = position_frames
+        self.timelines_frame.setValue(position_frames)
 
     def SetPlayheadFollow(self, enable_follow):
         """ Enable / Disable follow mode """
@@ -1027,6 +1054,38 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         # Seek to the 1st frame
         self.SeekSignal.emit(timeline_length_int)
 
+    def actionSeekPreviousFrame_trigger(self, event):
+        # Pause video
+        self.actionPlay_trigger(None, force="pause")
+
+        # Get the video player object
+        player = self.preview_thread.player
+
+        # Set speed to 0
+        if player.Speed() != 0:
+            self.SpeedSignal.emit(0)
+        # Seek to previous frame
+        self.SeekSignal.emit(player.Position() - 1)
+
+        # Notify properties dialog
+        self.propertyTableView.select_frame(player.Position())
+
+    def actionSeekNextFrame_trigger(self, event):
+        # Pause video
+        self.actionPlay_trigger(None, force="pause")
+
+        # Get the video player object
+        player = self.preview_thread.player
+
+        # Set speed to 0
+        if player.Speed() != 0:
+            self.SpeedSignal.emit(0)
+        # Seek to next frame
+        self.SeekSignal.emit(player.Position() + 1)
+
+        # Notify properties dialog
+        self.propertyTableView.select_frame(player.Position())
+
     def actionSaveFrame_trigger(self, event):
         log.info("actionSaveFrame_trigger")
 
@@ -1057,6 +1116,9 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
             self.statusBar.showMessage(_("Save Frame cancelled..."), 5000)
             return
 
+        # Set scale mode to higher quality (to skip chroma optimizations of preview and get Export-like quality)
+        openshot.Settings.Instance().HIGH_QUALITY_SCALING = True
+
         # Append .png if needed
         if not framePath.endswith(".png"):
             framePath = "%s.png" % framePath
@@ -1067,8 +1129,8 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         # Pause playback (to prevent crash since we are fixing to change the timeline's max size)
         app.window.actionPlay_trigger(None, force="pause")
 
-        # Save current cache object and create a new CacheMemory object (ignore quality and scale prefs)
-        old_cache_object = self.cache_object
+        # Create a new CacheMemory object (ignore quality and scale prefs)
+        self.timeline_sync.timeline.ClearAllCache()
         new_cache_object = openshot.CacheMemory(settings.get_settings().get("cache-limit-mb") * 1024 * 1024)
         self.timeline_sync.timeline.SetCache(new_cache_object)
 
@@ -1091,13 +1153,13 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         else:
             self.statusBar.showMessage(_("Failed to save image to %s" % framePath), 5000)
 
+        # Return scale mode to lower quality scaling (for faster previews)
+        openshot.Settings.Instance().HIGH_QUALITY_SCALING = False
+
         # Reset the MaxSize to match the preview and reset the preview cache
         viewport_rect = self.videoPreview.centeredViewport(self.videoPreview.width(), self.videoPreview.height())
         self.timeline_sync.timeline.SetMaxSize(viewport_rect.width(), viewport_rect.height())
-        self.cache_object.Clear()
-        self.timeline_sync.timeline.SetCache(old_cache_object)
-        self.cache_object = old_cache_object
-        old_cache_object = None
+        self.InitCacheSettings()
         new_cache_object = None
 
     def renumber_all_layers(self, insert_at=None, stride=1000000):
@@ -1191,7 +1253,7 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
 
         # Create new track above existing layer(s)
         track = Track()
-        track.data = {"number": track_number, "y": 0, "label": "", "lock": False}
+        track.data = {"number": track_number, "y": 0, "label": "", "lock": False, "skip_audio": False, "skip_video": False}
         track.save()
 
     def actionAddTrackAbove_trigger(self, event):
@@ -1230,7 +1292,7 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
 
             # Create new track and insert
             track = Track()
-            track.data = {"number": new_track_num, "y": 0, "label": "", "lock": False}
+            track.data = {"number": new_track_num, "y": 0, "label": "", "lock": False, "skip_audio": False, "skip_video": False}
             track.save()
         else:
             # Track numbering is too tight, renumber them all and insert
@@ -1280,7 +1342,7 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
 
             # Create new track and insert
             track = Track()
-            track.data = {"number": new_track_num, "y": 0, "label": "", "lock": False}
+            track.data = {"number": new_track_num, "y": 0, "label": "", "lock": False, "skip_audio": False, "skip_video": False}
             track.save()
         else:
             # Track numbering is too tight, renumber them all and insert
@@ -1477,6 +1539,18 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
                 keyboard_shortcuts.append(setting)
         return keyboard_shortcuts
 
+    def setPreviewSpeed(self, speed=1.0):
+        # Set preview playback speed
+
+        # Get the video player object
+        player = self.preview_thread.player
+
+        if player.Mode() == openshot.PLAYBACK_PLAY:
+            self.SpeedSignal.emit(speed)
+
+    def updPreviewSpeed(self):
+        self.setPreviewSpeed(self.preview_speed.value())
+
     def keyPressEvent(self, event):
         """ Process key press events and match with known shortcuts"""
         # Detect the current KeySequence pressed (including modifier keys)
@@ -1501,28 +1575,10 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
 
         # Basic shortcuts i.e just a letter
         if key.matches(self.getShortcutByName("seekPreviousFrame")) == QKeySequence.ExactMatch:
-            # Pause video
-            self.actionPlay_trigger(event, force="pause")
-            # Set speed to 0
-            if player.Speed() != 0:
-                self.SpeedSignal.emit(0)
-            # Seek to previous frame
-            self.SeekSignal.emit(player.Position() - 1)
-
-            # Notify properties dialog
-            self.propertyTableView.select_frame(player.Position())
+            self.actionSeekPreviousFrame.trigger()
 
         elif key.matches(self.getShortcutByName("seekNextFrame")) == QKeySequence.ExactMatch:
-            # Pause video
-            self.actionPlay_trigger(event, force="pause")
-            # Set speed to 0
-            if player.Speed() != 0:
-                self.SpeedSignal.emit(0)
-            # Seek to next frame
-            self.SeekSignal.emit(player.Position() + 1)
-
-            # Notify properties dialog
-            self.propertyTableView.select_frame(player.Position())
+            self.actionSeekNextFrame.trigger()
 
         elif key.matches(self.getShortcutByName("rewindVideo")) == QKeySequence.ExactMatch:
             # Toggle rewind and start playback
@@ -1885,6 +1941,216 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         selected_track.data['lock'] = False
         selected_track.save()
 
+    def actionEnableAllStreams_trigger(self, event):
+        """ Callback for enable all streams in a track """
+
+        # Get details of track
+        track_id = self.selected_tracks[0]
+        selected_track = Track.get(id=track_id)
+
+        # Enable Audio+Video for the track and save
+        selected_track.data["skip_audio"] = False
+        selected_track.data["skip_video"] = False
+
+        # Ignore undo/redo history for the action
+        get_app().updates.ignore_history = True
+        selected_track.save()
+        get_app().updates.ignore_history = False
+
+        track_list = []
+        if "number" in selected_track.data:
+            track_list.append(selected_track.data["number"])
+
+        # Restore Audio+Video
+        self.restoreStream(self.timeline_sync.timeline, "av", track_list)
+
+    def actionAudioOnlyStream_trigger(self, event):
+        """ Callback for enable audio only stream in a track """
+
+        # Get details of track
+        track_id = self.selected_tracks[0]
+        selected_track = Track.get(id=track_id)
+
+        # Enable Audio only for the track and save
+        selected_track.data["skip_audio"] = False
+        selected_track.data["skip_video"] = True
+
+        # Ignore undo/redo history for the action
+        get_app().updates.ignore_history = True
+        selected_track.save()
+        get_app().updates.ignore_history = False
+
+        track_list = []
+        if "number" in selected_track.data:
+            track_list.append(selected_track.data["number"])
+
+        # Skip Video
+        self.skipStream(self.timeline_sync.timeline, "v", track_list)
+
+        # Restore Audio
+        self.restoreStream(self.timeline_sync.timeline, "a", track_list)
+
+    def actionVideoOnlyStream_trigger(self, event):
+        """ Callback for enable video only stream in a track """
+
+        # Get details of track
+        track_id = self.selected_tracks[0]
+        selected_track = Track.get(id=track_id)
+
+        # Enable Video only for the track and save
+        selected_track.data["skip_audio"] = True
+        selected_track.data["skip_video"] = False
+
+        # Ignore undo/redo history for the action
+        get_app().updates.ignore_history = True
+        selected_track.save()
+        get_app().updates.ignore_history = False
+
+        track_list = []
+        if "number" in selected_track.data:
+            track_list.append(selected_track.data["number"])
+
+        # Skip Audio
+        self.skipStream(self.timeline_sync.timeline, "a", track_list)
+
+        # Restore Video
+        self.restoreStream(self.timeline_sync.timeline, "v", track_list)
+
+    def actionNoStreams_trigger(self, event):
+        """ Callback for disabling all streams in a track """
+
+        # Get details of track
+        track_id = self.selected_tracks[0]
+        selected_track = Track.get(id=track_id)
+
+        # Disable both Audio and Video for the track and save
+        selected_track.data["skip_audio"] = True
+        selected_track.data["skip_video"] = True
+
+        # Ignore undo/redo history for the action
+        get_app().updates.ignore_history = True
+        selected_track.save()
+        get_app().updates.ignore_history = False
+
+        track_list = []
+        if "number" in selected_track.data:
+            track_list.append(selected_track.data["number"])
+
+        # Skip Audio+Video
+        self.skipStream(self.timeline_sync.timeline, "av", track_list)
+
+    def skipStream(self, timeline, skip_type="av", track_list=[]):
+        """ Override given timeline object with the special JSON
+            entry to disable media streams
+        """
+        # skip_type "a" is for Audio stream
+        # skip_type "v" is for Video stream
+
+        # JSON string to disable whole stream
+        disable_audio_str = '{"has_audio": { "Points": [{"co": {"X": 1.0, "Y": 0.0}, "interpolation": 2}] }}'
+        disable_video_str = '{"has_video": { "Points": [{"co": {"X": 1.0, "Y": 0.0}, "interpolation": 2}] }}'
+
+        audio = "a" in skip_type
+        video = "v" in skip_type
+
+        # Disable audio/video for each clip that is on the track_list
+        clips = timeline.Clips()
+        for clip in clips:
+            track_number = clip.Layer()
+            if (track_number in track_list):
+                if audio:
+                    clip.SetJson(disable_audio_str)
+                if video:
+                    clip.SetJson(disable_video_str)
+
+        # Update preview cache because it's not valid any more
+        self.timeline_sync.timeline.ClearAllCache()
+
+        # Forcing full model update
+        self.propertyTableView.clip_properties_model.new_item = True
+        self.propertyTableView.clip_properties_model.update_model()
+
+    def restoreStream(self, timeline, restore_type="av", track_list=[]):
+        """ Load given timeline object with the JSON from the real
+            timeline to restore media streams state
+        """
+        # restore_type "a" is for Audio stream
+        # restore_type "v" is for Video stream
+
+        if "clips" not in get_app().project._data:
+            return
+
+        restore_audio = {}
+        restore_video = {}
+        audio = "a" in restore_type
+        video = "v" in restore_type
+
+        json_clips = get_app().project._data["clips"]
+        for clip in json_clips:
+            if "layer" in clip:
+                if (clip["layer"] in track_list):
+                    if audio and ("has_audio" in clip):
+                        # Get original "has_audio" json string for the clip
+                        restore_audio[clip["id"]] = { "has_audio": clip["has_audio"] }
+                    if video and ("has_video" in clip):
+                        # Get original "has_video" json string for the clip
+                        restore_video[clip["id"]] = { "has_video": clip["has_video"] }
+
+        # Restore has_audio/has_video for each clip of interest
+        clips = timeline.Clips()
+        for clip in clips:
+            id = clip.Id()
+            if audio and (id in restore_audio):
+                # Restore original "has_audio" json string for the Clip
+                str = json.dumps(restore_audio[id])
+                clip.SetJson(str)
+            if video and (id in restore_video):
+                # Restore original "has_video" json string for the Clip
+                str = json.dumps(restore_video[id])
+                clip.SetJson(str)
+
+        # Update preview cache because it's not valid any more
+        self.timeline_sync.timeline.ClearAllCache()
+
+        # Forcing full model update
+        self.propertyTableView.clip_properties_model.new_item = True
+        self.propertyTableView.clip_properties_model.update_model()
+
+    def restoreAllStreams(self):
+        # Get all Tracks numbers
+        all_tracks = get_app().project.get("layers")
+        track_list = []
+        for track in all_tracks:
+            if "number" in track:
+                track_list.append(track["number"])
+
+        # Restore Audio+Video
+        self.restoreStream(self.timeline_sync.timeline, "av", track_list)
+
+    def getTracksToSkip(self):
+        # Get all Tracks
+        all_tracks = get_app().project.get("layers")
+
+        # Get track number to skip audio or video
+        skip_audio = []
+        skip_video = []
+        for track in all_tracks:
+            if "skip_audio" in track:
+                if track["skip_audio"]:
+                    skip_audio.append(track["number"])
+            if "skip_video" in track:
+                if track["skip_video"]:
+                    skip_video.append(track["number"])
+        return [skip_audio, skip_video]
+
+    def upd_track_skipping(self):
+        # Get skip lists of track numbers and skip audio/video streams
+        skip_audio, skip_video = self.getTracksToSkip()
+        if skip_audio:
+            self.skipStream(self.timeline_sync.timeline, "a", skip_audio)
+        if skip_video:
+            self.skipStream(self.timeline_sync.timeline, "v", skip_video)
+
     def actionRenameTrack_trigger(self, event):
         """Callback for renaming track"""
         log.info('actionRenameTrack_trigger')
@@ -1930,6 +2196,22 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
     def actionFullscreen_trigger(self, event):
         # Toggle fullscreen state (current state mask XOR WindowFullScreen)
         self.setWindowState(self.windowState() ^ Qt.WindowFullScreen)
+
+    def actionCurveEditor_trigger(self, event):
+        crvEdt = self.findChild(QDockWidget, 'dockCurveEditor', Qt.FindDirectChildrenOnly)
+        if crvEdt is None:
+            # if Dock doesn't exist - create new one as tab of the Timeline pane
+            crvEdt = CurveEditor(self)
+            if crvEdt is None:
+                return
+            else:
+                self.tabifyDockWidget(self.dockTimeline, crvEdt)
+
+        crvEdt.show()
+        self.curve_editor_enable = True
+
+        # make Dock window on the top eachtime the Action triggered
+        crvEdt.raise_()
 
     def actionFile_Properties_trigger(self, event):
         log.info("Show file properties")
@@ -2248,6 +2530,7 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         s = settings.get_settings()
 
         # Save window state and geometry (saves toolbar and dock locations)
+        s.set('curve_editor_enable', self.curve_editor_enable)
         s.set('window_state_v2', qt_types.bytes_to_str(self.saveState()))
         s.set('window_geometry_v2', qt_types.bytes_to_str(self.saveGeometry()))
         s.set('docks_frozen', self.docks_frozen)
@@ -2255,6 +2538,10 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
     # Get window settings from setting store
     def load_settings(self):
         s = settings.get_settings()
+
+        # Do not load Curve Editor window if it was closed last time
+        if s.get('curve_editor_enable'):
+            self.actionCurveEditor.trigger()
 
         # Window state and geometry (also toolbar, dock locations and frozen UI state)
         if s.get('window_state_v2'):
@@ -2396,31 +2683,29 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         # Add Video Preview toolbar
         self.videoToolbar = QToolBar("Video Toolbar")
 
-        # Add fixed spacer(s) (one for each "Other control" to keep playback controls centered)
-        ospacer1 = QWidget(self)
-        ospacer1.setMinimumSize(32, 1)  # actionSaveFrame
-        self.videoToolbar.addWidget(ospacer1)
-
         # Add left spacer
-        spacer = QWidget(self)
-        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.videoToolbar.addWidget(spacer)
+        self.videoToolbar.addWidget(self.spacerLeft)
 
-        # Playback controls (centered)
-        self.videoToolbar.addAction(self.actionJumpStart)
-        self.videoToolbar.addAction(self.actionRewind)
+        # Playback controls
         self.videoToolbar.addAction(self.actionPlay)
-        self.videoToolbar.addAction(self.actionFastForward)
+        self.videoToolbar.addWidget(self.preview_speed)
+        self.videoToolbar.addAction(self.actionJumpStart)
         self.videoToolbar.addAction(self.actionJumpEnd)
+        self.videoToolbar.addAction(self.actionSeekPreviousFrame)
+        self.videoToolbar.addAction(self.actionSeekNextFrame)
         self.actionPlay.setCheckable(True)
 
-        # Add right spacer
+        # Add center spacer
         spacer = QWidget(self)
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.videoToolbar.addWidget(spacer)
 
         # Other controls (right-aligned)
+        self.videoToolbar.addWidget(self.timelines_frame)
         self.videoToolbar.addAction(self.actionSaveFrame)
+
+        # Add right spacer
+        self.videoToolbar.addWidget(self.spacerRight)
 
         self.tabVideo.layout().addWidget(self.videoToolbar)
 
@@ -2465,6 +2750,12 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
 
         # Add timeline toolbar to web frame
         self.frameWeb.addWidget(self.timelineToolbar)
+
+    def setPreviewSpacerWidth(self, size):
+        if self.videoPreview.previewAreaSize:
+            dist = (size.width() - self.videoPreview.previewAreaSize.width()) / 2
+            self.spacerLeft.setMinimumWidth(dist)
+            self.spacerRight.setMinimumWidth(dist)
 
     def clearSelections(self):
         """Clear all selection containers"""
@@ -2642,6 +2933,31 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         # Init UI
         ui_util.init_ui(self)
 
+        # Widget to display current preview playback speed
+        self.preview_speed = QDoubleSpinBox(self)
+        self.preview_speed.setDecimals(0)
+        self.preview_speed.setRange(-99, 99)
+        self.preview_speed.setValue(1)
+
+        # Not translatable symbol with meaning of "Scale"
+        self.preview_speed.setSuffix("x")
+        self.preview_speed.setToolTip( _("Preview Speed") )
+
+        # Widget to display global frame number of the cursor position on the Timeline
+        self.timelines_frame = QDoubleSpinBox(self)
+        self.timelines_frame.setToolTip( _("Current Frame") )
+
+        # Upper limit 72h at 60 fps, the Export fields doesn't allow to enter more
+        self.timelines_frame.setRange(1, 99999999)
+        self.timelines_frame.setDecimals(0)
+        self.timelines_frame.setAlignment(Qt.AlignRight)
+
+        # Adjustable size Preview tool bar spacers
+        self.spacerLeft = QWidget(self)
+        self.spacerRight = QWidget(self)
+        self.spacerLeft.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        self.spacerRight.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+
         # Setup toolbars that aren't on main window, set initial state of items, etc
         self.setup_toolbars()
 
@@ -2677,6 +2993,7 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         self.files_model = FilesModel()
         self.filesTreeView = FilesTreeView(self.files_model)
         self.filesListView = FilesListView(self.files_model)
+        self.files_model.update_model()
         self.tabFiles.layout().insertWidget(-1, self.filesTreeView)
         self.tabFiles.layout().insertWidget(-1, self.filesListView)
         if s.get("file_view") == "details":
@@ -2693,6 +3010,7 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         self.transition_model = TransitionsModel()
         self.transitionsTreeView = TransitionsTreeView(self.transition_model)
         self.transitionsListView = TransitionsListView(self.transition_model)
+        self.transition_model.update_model()
         self.tabTransitions.layout().insertWidget(-1, self.transitionsTreeView)
         self.tabTransitions.layout().insertWidget(-1, self.transitionsListView)
         if s.get("transitions_view") == "details":
@@ -2709,6 +3027,7 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         self.effects_model = EffectsModel()
         self.effectsTreeView = EffectsTreeView(self.effects_model)
         self.effectsListView = EffectsListView(self.effects_model)
+        self.effects_model.update_model()
         self.tabEffects.layout().insertWidget(-1, self.effectsTreeView)
         self.tabEffects.layout().insertWidget(-1, self.effectsListView)
         if s.get("effects_view") == "details":
@@ -2722,8 +3041,9 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
         self.effectsView.setFocus()
 
         # Setup emojis view
-        self.emoji_model = EmojisModel()
-        self.emojiListView = EmojisListView(self.emoji_model)
+        self.emojis_model = EmojisModel()
+        self.emojiListView = EmojisListView(self.emojis_model)
+        self.emojis_model.update_model()
         self.tabEmojis.layout().addWidget(self.emojiListView)
 
         # Set up status bar
@@ -2872,6 +3192,22 @@ class MainWindow(QMainWindow, updates.UpdateWatcher):
 
         # Save settings
         s.save()
+
+        # Timer to apply last Navigation changes with 0.5 sec delay if new one is not come up yet
+        self.navigateToFrame = 1
+        self.navigateToFrame_timer = QTimer()
+        self.navigateToFrame_timer.setSingleShot(True)
+        self.navigateToFrame_timer.setInterval(500)
+        self.navigateToFrame_timer.timeout.connect(self.navigateToFrameTimeout)
+        self.timelines_frame.valueChanged.connect(self.movePlayheadFrames)
+        self.timelines_frame.editingFinished.connect(self.navigateToFrameTimeout)
+
+        # Preview Speed connections
+        self.preview_speed.valueChanged.connect(self.setPreviewSpeed)
+        self.preview_speed.editingFinished.connect(self.updPreviewSpeed)
+
+        # Preview widget was changed - adjust UI controls position
+        self.MaxSizeChanged.connect(self.setPreviewSpacerWidth)
 
         # Refresh frame
         QTimer.singleShot(100, self.refreshFrameSignal.emit)

@@ -67,8 +67,17 @@ class PropertiesModel(updates.UpdateInterface):
         # Handle change
         if action.key and action.key[0] in ["clips", "effects"] and action.type in ["update", "insert"]:
             log.info(action.values)
+
+            # Get old value to determine if Clip's layer was shifted in action
+            if "layer" in action.old_values:
+                self.old_clip_layer = action.old_values["layer"]
+            else:
+                self.old_clip_layer = 0
+
             # Update the model data
+            self.from_action_upd = True
             self.update_model(get_app().window.txtPropertyFilter.text())
+            self.from_action_upd = False
 
     # Update the selected item (which drives what properties show up)
     def update_item(self, item_id, item_type):
@@ -81,6 +90,9 @@ class PropertiesModel(updates.UpdateInterface):
 
     # Update the next item (once the timer runs out)
     def update_item_timeout(self):
+        # Stop QTimer
+        self.update_timer.stop()
+
         # Get the next item id, and type
         item_id = self.next_item_id
         item_type = self.next_item_type
@@ -309,8 +321,12 @@ class PropertiesModel(updates.UpdateInterface):
                         # Keyframe
                         # Loop through points, find a matching points on this frame
                         found_point = False
+                        last_point_idx = 0
                         for point in c.data[property_key][color]["Points"]:
                             log.info("looping points: co.X = %s" % point["co"]["X"])
+                            if point["co"]["X"] < self.frame_number:
+                                # Remember index(+1) of the point previous to the current frame
+                                last_point_idx += 1
                             if interpolation == -1 and point["co"]["X"] == self.frame_number:
                                 # Found point, Update value
                                 found_point = True
@@ -324,13 +340,12 @@ class PropertiesModel(updates.UpdateInterface):
                                 # Only update interpolation type (and the LEFT side of the curve)
                                 found_point = True
                                 clip_updated = True
-                                point["interpolation"] = interpolation
                                 if interpolation == 0:
                                     point["handle_right"] = point.get("handle_right") or {"Y": 0.0, "X": 0.0}
                                     point["handle_right"]["X"] = interpolation_details[0]
                                     point["handle_right"]["Y"] = interpolation_details[1]
 
-                                log.info("updating interpolation mode point: co.X = %s to %s" % (point["co"]["X"], interpolation))
+                                log.info("updating interpolation preset of the point: co.X = %s" % (point["co"]["X"]))
                                 log.info("use interpolation preset: %s" % str(interpolation_details))
 
                             elif interpolation > -1 and point["co"]["X"] == closest_point_x:
@@ -350,7 +365,7 @@ class PropertiesModel(updates.UpdateInterface):
                         if not found_point:
                             clip_updated = True
                             log.info("Created new point at X=%s" % self.frame_number)
-                            c.data[property_key][color]["Points"].append({'co': {'X': self.frame_number, 'Y': new_value}, 'interpolation': 1})
+                            c.data[property_key][color]["Points"].insert(last_point_idx, {'co': {'X': self.frame_number, 'Y': new_value}, 'interpolation': 1})
 
                 # Reduce # of clip properties we are saving (performance boost)
                 c.data = {property_key: c.data[property_key]}
@@ -436,8 +451,12 @@ class PropertiesModel(updates.UpdateInterface):
                     # Loop through points, find a matching points on this frame
                     found_point = False
                     point_to_delete = None
+                    last_point_idx = 0
                     for point in c.data[property_key]["Points"]:
                         log.info("looping points: co.X = %s" % point["co"]["X"])
+                        if point["co"]["X"] < self.frame_number:
+                            # Remember index(+1) of the point previous to the current frame
+                            last_point_idx += 1
                         if interpolation == -1 and point["co"]["X"] == self.frame_number:
                             # Found point, Update value
                             found_point = True
@@ -454,13 +473,12 @@ class PropertiesModel(updates.UpdateInterface):
                             # Only update interpolation type (and the LEFT side of the curve)
                             found_point = True
                             clip_updated = True
-                            point["interpolation"] = interpolation
                             if interpolation == 0:
                                 point["handle_right"] = point.get("handle_right") or {"Y": 0.0, "X": 0.0}
                                 point["handle_right"]["X"] = interpolation_details[0]
                                 point["handle_right"]["Y"] = interpolation_details[1]
 
-                            log.info("updating interpolation mode point: co.X = %s to %s" % (point["co"]["X"], interpolation))
+                            log.info("updating interpolation preset of the point: co.X = %s" % (point["co"]["X"]))
                             log.info("use interpolation preset: %s" % str(interpolation_details))
 
                         elif interpolation > -1 and point["co"]["X"] == closest_point_x:
@@ -486,7 +504,7 @@ class PropertiesModel(updates.UpdateInterface):
                     elif not found_point and new_value != None:
                         clip_updated = True
                         log.info("Created new point at X=%s" % self.frame_number)
-                        c.data[property_key]["Points"].append({'co': {'X': self.frame_number, 'Y': new_value}, 'interpolation': 1})
+                        c.data[property_key]["Points"].insert(last_point_idx, {'co': {'X': self.frame_number, 'Y': new_value}, 'interpolation': 1})
 
             if not clip_updated:
                 # If no keyframe was found, set a basic property
@@ -545,12 +563,14 @@ class PropertiesModel(updates.UpdateInterface):
             self.parent.clearSelection()
 
     def update_model(self, filter=""):
+        # Properties model update/creation
+
+        if self.ignore_model_upd:
+            return
+
         log.info("updating clip properties model.")
         app = get_app()
         _ = app._tr
-
-        # Stop QTimer
-        self.update_timer.stop()
 
         # Check for a selected clip
         if self.selected and self.selected[0]:
@@ -573,6 +593,20 @@ class PropertiesModel(updates.UpdateInterface):
             # Ignore any events from this method
             self.ignore_update_signal = True
 
+            # Get layer of the item (Track # the Clip lies on)
+            layer = 0
+            for property in all_properties.items():
+                if "layer" == property[0]:
+                    layer = property[1]["value"]
+                    if self.from_action_upd and self.old_clip_layer and (layer != self.old_clip_layer):
+                        # Clip(s) got shifted on the Track
+                        # Ignore self-updates during stream skipping
+                        # New Model will be built after the skip complete
+                        self.ignore_model_upd = True
+                        get_app().window.restoreAllStreams()
+                        get_app().window.upd_track_skipping()
+                        self.ignore_model_upd = False
+
             # Clear previous model data (if item is different)
             if self.new_item:
                 # Prepare for new properties
@@ -582,6 +616,7 @@ class PropertiesModel(updates.UpdateInterface):
                 # Add Headers
                 self.model.setHorizontalHeaderLabels([_("Property"), _("Value")])
 
+            all_tracks = get_app().project.get("layers")
 
             # Loop through properties, and build a model
             for property in all_properties.items():
@@ -596,6 +631,28 @@ class PropertiesModel(updates.UpdateInterface):
                 interpolation = property[1]["interpolation"]
                 closest_point_x = property[1]["closest_point_x"]
                 choices = property[1]["choices"]
+
+                # Prevent has_audio/has_video property creation,
+                # so it can't be edited through UI
+                skip_item = False
+                audio_prop = False
+                video_prop = False
+
+                if name == "has_audio":
+                    audio_prop = True
+                elif name == "has_video":
+                    video_prop = True
+
+                if audio_prop or video_prop:
+                    for track in all_tracks:
+                        if track["number"] == layer:
+                            # When stream for the Track is disabled,
+                            # exclude correponding item from the model
+                            if (audio_prop and track["skip_audio"]) or (video_prop and track["skip_video"]):
+                                skip_item = True
+                                break
+                if skip_item:
+                    continue
 
                 # Adding Transparency to translation file
                 transparency_label = _("Transparency")
@@ -653,7 +710,6 @@ class PropertiesModel(updates.UpdateInterface):
                         col.setText(fileName)
                     elif type == "int" and label == "Track":
                         # Find track display name
-                        all_tracks = get_app().project.get("layers")
                         display_count = len(all_tracks)
                         display_label = None
                         for track in reversed(sorted(all_tracks, key=itemgetter('number'))):
@@ -732,7 +788,6 @@ class PropertiesModel(updates.UpdateInterface):
                         col.setText("")
                     elif type == "int" and label == "Track":
                         # Find track display name
-                        all_tracks = get_app().project.get("layers")
                         display_count = len(all_tracks)
                         display_label = None
                         for track in reversed(sorted(all_tracks, key=itemgetter('number'))):
@@ -828,6 +883,15 @@ class PropertiesModel(updates.UpdateInterface):
         self.update_timer.stop()
         self.next_item_id = None
         self.next_item_type = None
+
+        # Previous Track number the Clip belongs to
+        self.old_clip_layer = 0
+
+        # Update comes from action (not Refresh view, filter etc.)
+        self.from_action_upd = False
+
+        # To ignore self-updates
+        self.ignore_model_upd = False
 
         # Connect data changed signal
         self.model.itemChanged.connect(self.value_updated)

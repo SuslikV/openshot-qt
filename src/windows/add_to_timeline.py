@@ -363,6 +363,8 @@ class AddToTimeline(QDialog):
             # Increment position by length of clip
             position += (end_time - start_time)
 
+        # Clip may be placed on track that has skip stream setting
+        get_app().window.upd_track_skipping()
 
         # Accept dialog
         super(AddToTimeline, self).accept()
@@ -404,7 +406,7 @@ class AddToTimeline(QDialog):
 
         # Update label
         total_parts = time_parts.secondsToTime(total, fps["num"], fps["den"])
-        timestamp = "%s:%s:%s:%s" % (total_parts["hour"], total_parts["min"], total_parts["sec"], total_parts["frame"])
+        timestamp = "%s:%s:%s [%s]" % (total_parts["hour"], total_parts["min"], total_parts["sec"], total_parts["frame"])
         self.lblTotalLengthValue.setText(timestamp)
 
     def reject(self):

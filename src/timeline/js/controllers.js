@@ -264,7 +264,7 @@ App.controller('TimelineCtrl',function($scope) {
 	  // Use JQuery to move playhead (for performance reasons) - scope.apply is too expensive here
 	  $(".playhead-top").css("left", (($scope.project.playhead_position * $scope.pixelsPerSecond) + $scope.playheadOffset) + "px");
 	  $(".playhead-line").css("left", (($scope.project.playhead_position * $scope.pixelsPerSecond) + $scope.playheadOffset) + "px");
-	  $("#ruler_time").text($scope.playheadTime.hour + ":" + $scope.playheadTime.min + ":" + $scope.playheadTime.sec + ":" + $scope.playheadTime.frame);
+	  $("#ruler_time").text($scope.playheadTime.hour + ":" + $scope.playheadTime.min + ":" + $scope.playheadTime.sec + " [" + $scope.playheadTime.frame + "]");
   };
 
   // Move the playhead to a specific frame
@@ -311,6 +311,14 @@ App.controller('TimelineCtrl',function($scope) {
 	  // Update GUI with position (so the preview can be updated)
 	  if ($scope.Qt) {
 		  timeline.PreviewClipFrame(clip_id, frame);
+	  }
+  };
+
+  // Set Frame number widget visibility/state
+  $scope.PreviewFrameNavigationEnable = function(is_editable) {
+	  // Update frame number widget state (enabled/disabled)
+	  if ($scope.Qt) {
+		  timeline.PreviewFrameNavigationEnable(is_editable);
 	  }
   };
 
@@ -640,7 +648,6 @@ App.controller('TimelineCtrl',function($scope) {
  $scope.ClearAllSelections = function() {
 	// Clear the selections on the main window
 	$scope.SelectTransition("", true);
-	$scope.SelectEffect("", true);
 
 	// Update scope
 	$scope.$apply(function() {
@@ -671,85 +678,118 @@ App.controller('TimelineCtrl',function($scope) {
 
  // Select clip in scope
  $scope.SelectClip = function(clip_id, clear_selections, event) {
- 	// Trim clip_id
- 	var id = clip_id.replace("clip_", "");
+    // Trim clip_id
+    var id = clip_id.replace("clip_", "");
 
-	// Clear transitions also (if needed)
-	if (id != "" && clear_selections) {
-		$scope.SelectTransition("", clear_selections);
-		$scope.SelectEffect("", clear_selections);
-	}
-	// Call slice method and exit (don't actually select the clip)
-	if (id != "" && $scope.enable_razor) {
+    // Is CTRL pressed?
+    var is_ctrl = false;
+    if (event && event.ctrlKey) {
+        is_ctrl = true;
+    }
+
+    // Clear transitions selection if needed
+    if (id != "" && clear_selections && !is_ctrl) {
+        $scope.SelectTransition("", true);
+    }
+
+    // Call slice method and exit (don't actually select the clip)
+    if (id != "" && $scope.enable_razor) {
         if ($scope.Qt) {
-			cursor_seconds = $scope.GetJavaScriptPosition(event.clientX);
+            cursor_seconds = $scope.GetJavaScriptPosition(event.clientX);
             timeline.RazorSliceAtCursor(id, "", cursor_seconds);
         }
-		// Don't actually select clip
+        // Don't actually select clip
         return;
     }
-	// Is CTRL pressed?
-	is_ctrl = false;
-	if (event && event.ctrlKey) {
-		is_ctrl = true;
-	}
 
- 	// Unselect all clips
-	for (var clip_index = 0; clip_index < $scope.project.clips.length; clip_index++) {
-		if ($scope.project.clips[clip_index].id == id) {
-			$scope.project.clips[clip_index].selected = true;
-			if ($scope.Qt) {
-				timeline.addSelection(id, "clip", clear_selections);
-			}
-		}
-		else if (clear_selections && !is_ctrl) {
-			$scope.project.clips[clip_index].selected = false;
-			if ($scope.Qt) {
-	 			timeline.removeSelection($scope.project.clips[clip_index].id, "clip");
-			}
-		}
-	}
+    // Update selection for clips
+    for (var clip_index = 0; clip_index < $scope.project.clips.length; clip_index++) {
+        if ($scope.project.clips[clip_index].id == id) {
+            // Invert selection if CTRL is pressed and not forced add and already selected
+            if (is_ctrl && clear_selections && ($scope.project.clips[clip_index].selected == true)) {
+                $scope.project.clips[clip_index].selected = false;
+                if ($scope.Qt) {
+                    timeline.removeSelection($scope.project.clips[clip_index].id, "clip");
+                }
+            }
+            else {
+                $scope.project.clips[clip_index].selected = true;
+                if ($scope.Qt) {
+                    // Do not clear selection if CTRL is pressed
+                    if (is_ctrl) {
+                        timeline.addSelection(id, "clip", false);
+                    }
+                    else {
+                        timeline.addSelection(id, "clip", clear_selections);
+                    }
+                }
+            }
+        }
+        else if (clear_selections && !is_ctrl) {
+            $scope.project.clips[clip_index].selected = false;
+            if ($scope.Qt) {
+                timeline.removeSelection($scope.project.clips[clip_index].id, "clip");
+            }
+        }
+    }
  };
 
-  // Select transition in scope
+ // Select transition in scope
  $scope.SelectTransition = function(tran_id, clear_selections, event) {
- 	// Trim tran_id
- 	var id = tran_id.replace("transition_", "");
+    // Trim tran_id
+    var id = tran_id.replace("transition_", "");
 
-	// Clear clips also (if needed)
-	if (id != "" && clear_selections) {
-		$scope.SelectClip("", true);
-		$scope.SelectEffect("", true);
-	}
-	// Call slice method and exit (don't actually select the transition)
-	if (id != "" && $scope.enable_razor) {
+    // Is CTRL pressed?
+    var is_ctrl = false;
+    if (event && event.ctrlKey) {
+        is_ctrl = true;
+    }
+
+    // Clear clips selection if needed
+    if (id != "" && clear_selections && !is_ctrl) {
+        $scope.SelectClip("", true);
+    }
+
+    // Call slice method and exit (don't actually select the transition)
+    if (id != "" && $scope.enable_razor) {
         if ($scope.Qt) {
-			cursor_seconds = $scope.GetJavaScriptPosition(event.clientX)
+            cursor_seconds = $scope.GetJavaScriptPosition(event.clientX)
             timeline.RazorSliceAtCursor("", id, cursor_seconds)
         }
-		// Don't actually select transition
+        // Don't actually select transition
         return;
     }
 
-	// Is CTRL pressed?
-	is_ctrl = false;
-	if (event && event.ctrlKey) {
-		is_ctrl = true;
-	}
-
- 	// Unselect all transitions
-	for (var tran_index = 0; tran_index < $scope.project.effects.length; tran_index++) {
-		if ($scope.project.effects[tran_index].id == id) {
-			$scope.project.effects[tran_index].selected = true;
-		 	if ($scope.Qt)
-				timeline.addSelection(id, "transition", clear_selections);
-		}
-		else if (clear_selections && !is_ctrl) {
-			$scope.project.effects[tran_index].selected = false;
-		 	if ($scope.Qt)
-			 	timeline.removeSelection($scope.project.effects[tran_index].id, "transition");
-		}
-	}
+    // Update selection for transitions
+    for (var tran_index = 0; tran_index < $scope.project.effects.length; tran_index++) {
+        if ($scope.project.effects[tran_index].id == id) {
+            // Invert selection if CTRL is pressed and not forced add and already selected
+            if (is_ctrl && clear_selections && ($scope.project.effects[tran_index].selected == true)) {
+                $scope.project.effects[tran_index].selected = false;
+                if ($scope.Qt) {
+                    timeline.removeSelection($scope.project.effects[tran_index].id, "transition");
+                }
+            }
+            else {
+                $scope.project.effects[tran_index].selected = true;
+                if ($scope.Qt) {
+                    // Do not clear selection if CTRL is pressed
+                    if (is_ctrl) {
+                        timeline.addSelection(id, "transition", false);
+                    }
+                    else {
+                        timeline.addSelection(id, "transition", clear_selections);
+                    }
+                }
+            }
+        }
+        else if (clear_selections && !is_ctrl) {
+            $scope.project.effects[tran_index].selected = false;
+            if ($scope.Qt) {
+                timeline.removeSelection($scope.project.effects[tran_index].id, "transition");
+            }
+        }
+    }
  };
 
   // Format the thumbnail path: http://127.0.0.1:8081/thumbnails/FILE-ID/FRAME-NUMBER/

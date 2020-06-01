@@ -38,7 +38,7 @@ import openshot  # Python module for libopenshot (required video editing module 
 from PyQt5.QtCore import QFileInfo, pyqtSlot, QUrl, Qt, QCoreApplication, QTimer
 from PyQt5.QtGui import QCursor, QKeySequence
 from PyQt5.QtWebKitWidgets import QWebView
-from PyQt5.QtWidgets import QMenu
+from PyQt5.QtWidgets import QMenu, QActionGroup
 
 from classes import info, updates
 from classes import settings
@@ -1294,8 +1294,41 @@ class TimelineWebView(QWebView, updates.UpdateInterface):
                 # Add keyframes
                 start = openshot.Point(start_animation, start_scale, openshot.BEZIER)
                 start_object = json.loads(start.Json())
+
+                # Start point shouldn't modify existing left handle and its type
+                del start_object['handle_left']
+                del start_object['handle_type']
+
+                # Default interpolation for keyframe insertion is LINEAR
+                # The BEZIER was used only to fill the handles fields
+                start_object['interpolation'] = openshot.LINEAR
+
                 end = openshot.Point(end_animation, end_scale, openshot.BEZIER)
                 end_object = json.loads(end.Json())
+
+                # End point shouldn't modify existing right handle of the point
+                del end_object['handle_right']
+
+                # Remove animation keys between start/end points for scale_x, scale_y
+                new_data = []
+                for point in clip.data["scale_x"]["Points"]:
+                    if (point['co']['X'] < start_animation) or (point['co']['X'] > end_animation):
+                        # Include only points that is not in the modified segment
+                        new_data.append(point)
+                    if point['co']['X'] == start_animation:
+                        # Do not modify existing interpolation of the previous segment
+                        start_object['interpolation'] = point['interpolation']
+                clip.data["scale_x"]["Points"] = new_data
+                new_data = []
+                for point in clip.data["scale_y"]["Points"]:
+                    if (point['co']['X'] < start_animation) or (point['co']['X'] > end_animation):
+                        # Include only points that is not in the modified segment
+                        new_data.append(point)
+                    if point['co']['X'] == start_animation:
+                        # Do not modify existing interpolation of the previous segment
+                        start_object['interpolation'] = point['interpolation']
+                clip.data["scale_y"]["Points"] = new_data
+
                 clip.data["gravity"] = openshot.GRAVITY_CENTER
                 clip.data["scale_x"]["Points"].append(start_object)
                 clip.data["scale_x"]["Points"].append(end_object)
@@ -2604,11 +2637,16 @@ class TimelineWebView(QWebView, updates.UpdateInterface):
         # Get track object
         track = Track.get(id=layer_id)
         locked = track.data.get("lock", False)
+        skip_audio = track.data.get("skip_audio", False)
+        skip_video = track.data.get("skip_video", False)
 
         menu = QMenu(self)
         menu.addAction(self.window.actionAddTrackAbove)
         menu.addAction(self.window.actionAddTrackBelow)
         menu.addAction(self.window.actionRenameTrack)
+        menu.addSeparator()
+
+        # Lock/Unlock Track
         if locked:
             menu.addAction(self.window.actionUnlockTrack)
             self.window.actionRemoveTrack.setEnabled(False)
@@ -2616,6 +2654,27 @@ class TimelineWebView(QWebView, updates.UpdateInterface):
             menu.addAction(self.window.actionLockTrack)
             self.window.actionRemoveTrack.setEnabled(True)
         menu.addSeparator()
+
+        # Enable/Skip Audio+Video streams for the Track
+        menu.addAction(self.window.actionEnableAllStreams)
+        menu.addAction(self.window.actionAudioOnlyStream)
+        menu.addAction(self.window.actionVideoOnlyStream)
+        menu.addAction(self.window.actionNoStreams)
+        exlusive_group = QActionGroup(menu)
+        exlusive_group.addAction(self.window.actionEnableAllStreams)
+        exlusive_group.addAction(self.window.actionAudioOnlyStream)
+        exlusive_group.addAction(self.window.actionVideoOnlyStream)
+        exlusive_group.addAction(self.window.actionNoStreams)
+        if skip_video and skip_audio:
+            self.window.actionNoStreams.setChecked(True)
+        elif skip_audio:
+            self.window.actionVideoOnlyStream.setChecked(True)
+        elif skip_video:
+            self.window.actionAudioOnlyStream.setChecked(True)
+        else:
+            self.window.actionEnableAllStreams.setChecked(True)
+        menu.addSeparator()
+
         menu.addAction(self.window.actionRemoveTrack)
         return menu.popup(QCursor.pos())
 
@@ -2651,6 +2710,11 @@ class TimelineWebView(QWebView, updates.UpdateInterface):
 
         # Seek to frame
         self.window.SeekSignal.emit(frame_number)
+
+    @pyqtSlot(bool)
+    def PreviewFrameNavigationEnable(self, is_editable):
+        # Enable frame navigation widget
+        self.window.timelines_frame.setEnabled(is_editable)
 
     @pyqtSlot(int)
     def PlayheadMoved(self, position_frames):
@@ -3021,6 +3085,9 @@ class TimelineWebView(QWebView, updates.UpdateInterface):
 
         # Accept event
         event.accept()
+
+        # Clip may be placed on track that has skip stream setting
+        get_app().window.upd_track_skipping()
 
         # Update the preview and reselct current frame in properties
         get_app().window.refreshFrameSignal.emit()

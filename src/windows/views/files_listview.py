@@ -30,8 +30,9 @@ import os
 
 from PyQt5.QtCore import QSize, Qt, QPoint, QRegExp
 from PyQt5.QtGui import QDrag, QCursor
-from PyQt5.QtWidgets import QListView, QAbstractItemView, QMenu
+from PyQt5.QtWidgets import QListView, QAbstractItemView, QMenu, QActionGroup
 
+from classes import settings
 from classes.app import get_app
 from classes.logger import log
 from classes.query import File
@@ -49,11 +50,82 @@ class FilesListView(QListView):
 
         index = self.indexAt(event.pos())
 
+        # Get translation function
+        _ = get_app()._tr
+
         # Build menu
         menu = QMenu(self)
 
         menu.addAction(self.win.actionImportFiles)
         menu.addAction(self.win.actionDetailsView)
+
+        # Sub-menu
+        menu.addSeparator()
+        sort_menu = QMenu(_("Sort by"), menu)
+
+        # -1 - Unsorted (from original model)
+        #  1 - Name
+        #  2 - Tags
+        #  3 - Type
+        #  4 - Path
+        #  5 - ID
+
+        all_sorting = [
+                        _("Unsorted"),
+                        _("Name"),
+                        _("Tags"),
+                        _("Type"),
+                        _("Path"),
+                        _("ID")
+                    ]
+
+        # Exclusive group
+        sorting_type_group = QActionGroup(menu)
+
+        # Update sorting
+        self.read_sorting_settings()
+
+        sort_option = None
+        for i, sort_by in enumerate(all_sorting):
+            sort_option = sort_menu.addAction(sort_by)
+            sort_option.setCheckable(True)
+            # Store option number inside the action itself
+            # Python handles the QVariant conversion here
+            if i == 0:
+                sort_option.setData(-1)
+                if self.sort_column == -1:
+                    sort_option.setChecked(True)
+            else:
+                sort_option.setData(i)
+                if self.sort_column == i:
+                    sort_option.setChecked(True)
+
+            # Add each to exclusive group
+            sort_option.setActionGroup(sorting_type_group)
+
+        # Use menu triggered signal for closely related actions, it carries pointer to the action
+        sort_menu.triggered.connect(self.update_sorting)
+        menu.addMenu(sort_menu)
+        menu.addSeparator()
+        menu.addAction
+        sort_up = menu.addAction( _("Ascending") )
+        sort_down = menu.addAction( _("Descending") )
+
+        sort_down.setCheckable(True)
+        sort_up.setCheckable(True)
+
+        # Exclusive group
+        sorting_order_group = QActionGroup(menu)
+        sort_up.setActionGroup(sorting_order_group)
+        sort_down.setActionGroup(sorting_order_group)
+
+        if self.sort_order == Qt.AscendingOrder:
+            sort_up.setChecked(True)
+        else:
+            sort_down.setChecked(True)
+
+        sort_up.toggled.connect(self.sort_ascending)
+        sort_down.toggled.connect(self.sort_descending)
 
         if index.isValid():
             # Look up the model item and our unique ID
@@ -83,6 +155,11 @@ class FilesListView(QListView):
 
         # Show menu
         menu.exec_(event.globalPos())
+
+        # The menu may be closed without action taken, thus disconnect old signals
+        sort_menu.triggered.disconnect(self.update_sorting)
+        sort_up.toggled.disconnect(self.sort_ascending)
+        sort_down.toggled.disconnect(self.sort_descending)
 
     def dragEnterEvent(self, event):
         # If dragging urls onto widget, accept
@@ -152,17 +229,70 @@ class FilesListView(QListView):
     def filter_changed(self):
         self.refresh_view()
 
+    def sort_ascending(self, checked=False):
+        if checked:
+            self.sort_order = Qt.AscendingOrder
+
+            # Save sorting order
+            s = settings.get_settings()
+            s.set("files_view_sorting_order", 0)
+
+            self.apply_items_sorting()
+
+    def sort_descending(self, checked=False):
+        if checked:
+            self.sort_order = Qt.DescendingOrder
+
+            # Save sorting order
+            s = settings.get_settings()
+            s.set("files_view_sorting_order", 1)
+
+            self.apply_items_sorting()
+
+    def update_sorting(self, action):
+        # Column:
+        # -1 - Unsorted (from original model)
+        #  1 - Name
+        #  2 - Tags
+        #  3 - Type
+        #  4 - Path
+        #  5 - ID
+
+        # Get what sorting was triggered
+        self.sort_column = action.data()
+
+        # Save sorting
+        s = settings.get_settings()
+        s.set("files_view_sorting", self.sort_column)
+
+        self.apply_items_sorting()
+
+    def apply_items_sorting(self):
+        self.model().sort(self.sort_column, self.sort_order)
+
     def refresh_view(self):
         """Filter files with proxy class"""
         model = self.model()
         filter_text = self.win.filesFilter.text()
         model.setFilterRegExp(QRegExp(filter_text.replace(' ', '.*'), Qt.CaseInsensitive))
 
-        col = model.sortColumn()
-        model.sort(col)
+        # Update sorting
+        self.read_sorting_settings()
+        self.apply_items_sorting()
 
     def resize_contents(self):
         pass
+
+    def read_sorting_settings(self):
+        # Get sorting settings
+        s = settings.get_settings()
+        order = s.get("files_view_sorting_order")
+        self.sort_order = Qt.AscendingOrder
+        if order == 1:
+            self.sort_order = Qt.DescendingOrder
+
+        # Column from the files model to sort by (-1 is unsorted)
+        self.sort_column = s.get("files_view_sorting")
 
     def __init__(self, model, *args):
         # Invoke parent init
@@ -174,6 +304,11 @@ class FilesListView(QListView):
         # Get Model data
         self.files_model = model
         self.setModel(self.files_model.proxy_model)
+
+        # Get sorting settings
+        self.sort_order = Qt.AscendingOrder
+        self.sort_column = -1
+        self.read_sorting_settings()
 
         # Remove the default selection model and wire up to the shared one
         self.selectionModel().deleteLater()
@@ -199,9 +334,6 @@ class FilesListView(QListView):
         self.setTextElideMode(Qt.ElideRight)
 
         self.files_model.ModelRefreshed.connect(self.refresh_view)
-
-        # Load initial files model data
-        self.files_model.update_model()
 
         # setup filter events
         app = get_app()

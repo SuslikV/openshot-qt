@@ -17,6 +17,10 @@
     "translate_values": true,
     "values": [
       {
+        "value": "Fusion",
+        "name": "Fusion"
+      },
+      {
         "value": "Humanity",
         "name": "Humanity"
       },
@@ -78,6 +82,20 @@
     "setting": "title_editor"
   },
   {
+    "value": false,
+    "title": "",
+    "type": "hidden",
+    "category": "Qt",
+    "setting": "curve_editor_enable"
+  },
+  {
+    "value": [100, 60, 8, 5, 1, 0],
+    "title": "",
+    "type": "hidden",
+    "category": "Qt",
+    "setting": "curve_editor_grid"
+  },
+  {
     "value": "AAAA/wAAAAD9AAAAAwAAAAAAAAEnAAAC3/wCAAAAAvwAAAJeAAAApwAAAAAA////+gAAAAACAAAAAfsAAAAYAGQAbwBjAGsASwBlAHkAZgByAGEAbQBlAAAAAAD/////AAAAAAAAAAD7AAAAHABkAG8AYwBrAFAAcgBvAHAAZQByAHQAaQBlAHMAAAAAJwAAAt8AAACnAP///wAAAAEAAAEcAAABQPwCAAAAAfsAAAAYAGQAbwBjAGsASwBlAHkAZgByAGEAbQBlAQAAAVgAAAAVAAAAAAAAAAAAAAACAAAERgAAAtj8AQAAAAH8AAAAAAAABEYAAAD6AP////wCAAAAAvwAAAAnAAABwAAAALQA/////AEAAAAC/AAAAAAAAAFcAAAAewD////6AAAAAAIAAAAD+wAAABIAZABvAGMAawBGAGkAbABlAHMBAAAAAP////8AAACYAP////sAAAAeAGQAbwBjAGsAVAByAGEAbgBzAGkAdABpAG8AbgBzAQAAAAD/////AAAAmAD////7AAAAFgBkAG8AYwBrAEUAZgBmAGUAYwB0AHMBAAAAAP////8AAACYAP////sAAAASAGQAbwBjAGsAVgBpAGQAZQBvAQAAAWIAAALkAAAARwD////7AAAAGABkAG8AYwBrAFQAaQBtAGUAbABpAG4AZQEAAAHtAAABEgAAAJYA////AAAERgAAAAEAAAABAAAAAgAAAAEAAAAC/AAAAAEAAAACAAAAAQAAAA4AdABvAG8AbABCAGEAcgEAAAAA/////wAAAAAAAAAA",
     "title": "",
     "type": "hidden",
@@ -104,6 +122,20 @@
     "type": "hidden",
     "category": "UI",
     "setting": "file_view"
+  },
+  {
+    "value": -1,
+    "title": "",
+    "type": "hidden",
+    "category": "UI",
+    "setting": "files_view_sorting"
+  },
+  {
+    "value": 0,
+    "title": "",
+    "type": "hidden",
+    "category": "UI",
+    "setting": "files_view_sorting_order"
   },
   {
     "value": "thumbnail",

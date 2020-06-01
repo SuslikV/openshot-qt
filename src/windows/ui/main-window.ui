@@ -215,6 +215,7 @@
    <addaction name="actionImportFiles"/>
    <addaction name="actionProfile"/>
    <addaction name="actionFullscreen"/>
+   <addaction name="actionCurveEditor"/>
    <addaction name="separator"/>
    <addaction name="actionExportVideo"/>
   </widget>
@@ -813,6 +814,28 @@
     <string>Jump To End</string>
    </property>
   </action>
+  <action name="actionSeekPreviousFrame">
+   <property name="icon">
+    <iconset>../../images/Humanity/actions/custom/media-frame-backward.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Seek to Previous Frame</string>
+   </property>
+   <property name="toolTip">
+    <string>Seek to Previous Frame</string>
+   </property>
+  </action>
+  <action name="actionSeekNextFrame">
+   <property name="icon">
+    <iconset>../../images/Humanity/actions/custom/media-frame-forward.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Seek to Next Frame</string>
+   </property>
+   <property name="toolTip">
+    <string>Seek to Next Frame</string>
+   </property>
+  </action>
   <action name="actionSaveFrame">
    <property name="icon">
     <iconset theme="camera-photo-symbolic" resource="../../images/openshot.qrc">
@@ -1135,6 +1158,20 @@
    </property>
    <property name="shortcut">
     <string>F11</string>
+   </property>
+  </action>
+  <action name="actionCurveEditor">
+   <property name="checkable">
+    <bool>false</bool>
+   </property>
+   <property name="icon">
+    <iconset>../../images/curve-editor.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Curve Editor</string>
+   </property>
+   <property name="toolTip">
+    <string>Curve Editor for key animations</string>
    </property>
   </action>
   <action name="actionView_Toolbar">
@@ -1554,6 +1591,50 @@
    </property>
    <property name="toolTip">
     <string>Unlock Track</string>
+   </property>
+  </action>
+  <action name="actionEnableAllStreams">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Enable Audio + Video</string>
+   </property>
+   <property name="toolTip">
+    <string>Enable Audio and Video streams</string>
+   </property>
+  </action>
+  <action name="actionAudioOnlyStream">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Skip Video</string>
+   </property>
+   <property name="toolTip">
+    <string>Disable Video stream</string>
+   </property>
+  </action>
+  <action name="actionVideoOnlyStream">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Skip Audio</string>
+   </property>
+   <property name="toolTip">
+    <string>Disable Audio stream</string>
+   </property>
+  </action>
+  <action name="actionNoStreams">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Skip All</string>
+   </property>
+   <property name="toolTip">
+    <string>Skip whole Track</string>
    </property>
   </action>
   <action name="actionTransform">
