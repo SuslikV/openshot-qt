@@ -90,6 +90,9 @@ class PropertiesModel(updates.UpdateInterface):
 
     # Update the next item (once the timer runs out)
     def update_item_timeout(self):
+        # Stop QTimer
+        self.update_timer.stop()
+
         # Get the next item id, and type
         item_id = self.next_item_id
         item_type = self.next_item_type
@@ -318,8 +321,12 @@ class PropertiesModel(updates.UpdateInterface):
                         # Keyframe
                         # Loop through points, find a matching points on this frame
                         found_point = False
+                        last_point_idx = 0
                         for point in c.data[property_key][color]["Points"]:
                             log.info("looping points: co.X = %s" % point["co"]["X"])
+                            if point["co"]["X"] < self.frame_number:
+                                # Remember index(+1) of the point previous to the current frame
+                                last_point_idx += 1
                             if interpolation == -1 and point["co"]["X"] == self.frame_number:
                                 # Found point, Update value
                                 found_point = True
@@ -333,13 +340,12 @@ class PropertiesModel(updates.UpdateInterface):
                                 # Only update interpolation type (and the LEFT side of the curve)
                                 found_point = True
                                 clip_updated = True
-                                point["interpolation"] = interpolation
                                 if interpolation == 0:
                                     point["handle_right"] = point.get("handle_right") or {"Y": 0.0, "X": 0.0}
                                     point["handle_right"]["X"] = interpolation_details[0]
                                     point["handle_right"]["Y"] = interpolation_details[1]
 
-                                log.info("updating interpolation mode point: co.X = %s to %s" % (point["co"]["X"], interpolation))
+                                log.info("updating interpolation preset of the point: co.X = %s" % (point["co"]["X"]))
                                 log.info("use interpolation preset: %s" % str(interpolation_details))
 
                             elif interpolation > -1 and point["co"]["X"] == closest_point_x:
@@ -359,7 +365,7 @@ class PropertiesModel(updates.UpdateInterface):
                         if not found_point:
                             clip_updated = True
                             log.info("Created new point at X=%s" % self.frame_number)
-                            c.data[property_key][color]["Points"].append({'co': {'X': self.frame_number, 'Y': new_value}, 'interpolation': 1})
+                            c.data[property_key][color]["Points"].insert(last_point_idx, {'co': {'X': self.frame_number, 'Y': new_value}, 'interpolation': 1})
 
                 # Reduce # of clip properties we are saving (performance boost)
                 c.data = {property_key: c.data[property_key]}
@@ -445,8 +451,12 @@ class PropertiesModel(updates.UpdateInterface):
                     # Loop through points, find a matching points on this frame
                     found_point = False
                     point_to_delete = None
+                    last_point_idx = 0
                     for point in c.data[property_key]["Points"]:
                         log.info("looping points: co.X = %s" % point["co"]["X"])
+                        if point["co"]["X"] < self.frame_number:
+                            # Remember index(+1) of the point previous to the current frame
+                            last_point_idx += 1
                         if interpolation == -1 and point["co"]["X"] == self.frame_number:
                             # Found point, Update value
                             found_point = True
@@ -463,13 +473,12 @@ class PropertiesModel(updates.UpdateInterface):
                             # Only update interpolation type (and the LEFT side of the curve)
                             found_point = True
                             clip_updated = True
-                            point["interpolation"] = interpolation
                             if interpolation == 0:
                                 point["handle_right"] = point.get("handle_right") or {"Y": 0.0, "X": 0.0}
                                 point["handle_right"]["X"] = interpolation_details[0]
                                 point["handle_right"]["Y"] = interpolation_details[1]
 
-                            log.info("updating interpolation mode point: co.X = %s to %s" % (point["co"]["X"], interpolation))
+                            log.info("updating interpolation preset of the point: co.X = %s" % (point["co"]["X"]))
                             log.info("use interpolation preset: %s" % str(interpolation_details))
 
                         elif interpolation > -1 and point["co"]["X"] == closest_point_x:
@@ -495,7 +504,7 @@ class PropertiesModel(updates.UpdateInterface):
                     elif not found_point and new_value != None:
                         clip_updated = True
                         log.info("Created new point at X=%s" % self.frame_number)
-                        c.data[property_key]["Points"].append({'co': {'X': self.frame_number, 'Y': new_value}, 'interpolation': 1})
+                        c.data[property_key]["Points"].insert(last_point_idx, {'co': {'X': self.frame_number, 'Y': new_value}, 'interpolation': 1})
 
             if not clip_updated:
                 # If no keyframe was found, set a basic property
@@ -562,9 +571,6 @@ class PropertiesModel(updates.UpdateInterface):
         log.info("updating clip properties model.")
         app = get_app()
         _ = app._tr
-
-        # Stop QTimer
-        self.update_timer.stop()
 
         # Check for a selected clip
         if self.selected and self.selected[0]:
