@@ -9,7 +9,7 @@ version: "{build}"
 branches:
   # whitelist
   only:
-    - patch-1
+    - what-you-have-missed-so-far
   # blacklisted
   except:
     - /.*/    # exclude all branches but whitelisted
@@ -35,9 +35,9 @@ environment:
     - platform: x64
       configuration: Release
       # OpenShot x64 dependencies folder
-      OPENSHOT_DEPS_DIR: 'C:\OPSH\Deps'
+      OPENSHOT_DEPS_DIR: 'C:\OPSH\Deps-WYH'
       # OpenShot x64 installation folder
-      OPENSHOT_INST_DIR: 'C:\OPSH\OpenShotVideoEditor'
+      OPENSHOT_INST_DIR: 'C:\OPSH\OpenShotVideoEditor-WYH'
       # Python folder
       PYTHONHOME: 'C:\Python37-x64'
       # Specifies where the source of Qt libs lies
@@ -87,8 +87,8 @@ build_script:
 # scripts to run after build (working directory and environment changes are persisted from the previous steps)
 after_build:
   - cmd: '%APPVEYOR_BUILD_FOLDER%\CI\pack-win-av.cmd'
-  - ps: Push-AppveyorArtifact "$Env:OPENSHOT_INST_DIR\openshot-win-$Env:PLATFORM.7z" -FileName "OpenShot-$(git --git-dir=$Env:APPVEYOR_BUILD_FOLDER\.git describe --always --abbrev=8)-win-$Env:PLATFORM-N$Env:APPVEYOR_BUILD_NUMBER.7z"
-  - ps: Push-AppveyorArtifact "$Env:OPENSHOT_INST_DIR\openshot-deps-win-$Env:PLATFORM.7z" -FileName "OpenShot-Deps-$(git --git-dir=$Env:APPVEYOR_BUILD_FOLDER\.git describe --always --abbrev=8)-win-$Env:PLATFORM-N$Env:APPVEYOR_BUILD_NUMBER.7z"
-  - ps: IF ( -not (Test-Path -Path "$Env:APPVEYOR_BUILD_FOLDER\downloads\openshot_pyqt5.txt")) {Push-AppveyorArtifact "$Env:OPENSHOT_INST_DIR\python-$Env:PLATFORM.7z" -FileName "Python3-$Env:PLATFORM-withPyQt5-5122-win-N$Env:APPVEYOR_BUILD_NUMBER.7z"}
+  - ps: Push-AppveyorArtifact "$Env:OPENSHOT_INST_DIR\openshot-win-$Env:PLATFORM.7z" -FileName "OpenShot-WYH-$(git --git-dir=$Env:APPVEYOR_BUILD_FOLDER\.git describe --always --abbrev=8)-win-$Env:PLATFORM-N$Env:APPVEYOR_BUILD_NUMBER.7z"
+  - ps: Push-AppveyorArtifact "$Env:OPENSHOT_INST_DIR\openshot-deps-win-$Env:PLATFORM.7z" -FileName "OpenShot-Deps-WYH-$(git --git-dir=$Env:APPVEYOR_BUILD_FOLDER\.git describe --always --abbrev=8)-win-$Env:PLATFORM-N$Env:APPVEYOR_BUILD_NUMBER.7z"
+  - ps: IF ( -not (Test-Path -Path "$Env:APPVEYOR_BUILD_FOLDER\downloads\openshot_pyqt5.txt")) {Push-AppveyorArtifact "$Env:OPENSHOT_INST_DIR\python-$Env:PLATFORM.7z" -FileName "Python3-WYH-$Env:PLATFORM-withPyQt5-5122-win-N$Env:APPVEYOR_BUILD_NUMBER.7z"}
 
 test: off
