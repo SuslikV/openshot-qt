@@ -527,12 +527,11 @@ class PropertiesTableView(QTableView):
                 SubMenuSize = 24
                 SubMenuNumber = 0
                 for sub_choice in choice["value"]:
-                    if len(choice["value"]) > SubMenuSize:
-                        if not SubMenu or len(SubMenu.children()) == SubMenuSize or sub_choice == choice["value"][-1]:
+                    if len(choice["value"]) > SubMenuSize: # each QMenu has additional self-QAction on creation
+                        if not SubMenu or len(SubMenu.children()) > SubMenuSize:
                             SubMenuNumber += 1
-                            if SubMenu:
-                                SubMenuRoot.addMenu(SubMenu)
-                            SubMenu = QMenu(str(SubMenuNumber), self)
+                            SubMenu = QMenu(str(SubMenuNumber), self) # Now it has QAction in it
+                            SubMenuRoot.addMenu(SubMenu)
                         Choice_Action = SubMenu.addAction(_(sub_choice["name"]))
                     else:
                         Choice_Action = SubMenuRoot.addAction(_(sub_choice["name"]))
