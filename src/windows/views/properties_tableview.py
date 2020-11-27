@@ -26,6 +26,7 @@
  """
 
 import os
+import glob
 from functools import partial
 from operator import itemgetter
 from PyQt5.QtCore import Qt, QRectF, QLocale, pyqtSignal, QObject, QTimer
@@ -396,6 +397,70 @@ class PropertiesTableView(QTableView):
             if self.menu_reset:
                 self.choices = []
                 self.menu_reset = False
+
+            # Handle string type values
+            # (special case FFmpegWYH filter file selection)
+            if self.property_type == "string" and property_name == _("Filter File") and not self.choices:
+                filter_file_mask = "*.txt"
+                all_masks_list = []
+                # Get program folder to look for filter files
+                complete_mask = os.path.join(info.PATH, "effects", "ffmpeg" , filter_file_mask)
+                all_masks_list.append(complete_mask)
+                # Get project folder to look for filter files
+                proj_path = get_app().project.current_filepath
+                if proj_path:
+                    proj_path = os.path.dirname(get_app().project.current_filepath)
+                    complete_mask = os.path.join(proj_path , filter_file_mask)
+                    all_masks_list.append(complete_mask)
+                else:
+                    all_masks_list.append("")
+
+                # Look at two sources of filter files, and add two sub-menus
+                for i, mask in enumerate(all_masks_list):
+                    filter_files = []
+                    txt_files = [f for f in glob.glob(mask)]
+                    files_path = [os.path.abspath(x) for x in txt_files]
+                    files_path.sort()
+
+                    # Fist place is a special "No filter" entry
+                    filter_files.insert(0, {"name": _("- Do nothing -"),
+                                            "value": "v1\n- No filter -\nSkips any adjustments.\n, buffersink\n~\n",
+                                            "selected": False
+                                            })
+
+                    # Reset all strings to join later
+                    filter_WYH_version = ""
+                    filter_name = ""
+                    filter_comment = ""
+                    filter_desc = ""
+                    filter_arg = ""
+                    for f in files_path:
+                        file_txt = open(f, 'r') # read only
+                        # Get 5 lines from the file
+                        filter_WYH_version = file_txt.readline()
+                        filter_name = file_txt.readline()
+                        filter_comment = file_txt.readline()
+                        filter_desc = file_txt.readline()
+                        filter_arg = file_txt.readline()
+                        full_filter_text = filter_WYH_version + filter_name + filter_comment + filter_desc + filter_arg
+                        file_txt.close()
+                        if filter_WYH_version and filter_name and filter_desc:
+                            if filter_WYH_version.rstrip() == "v1" or filter_WYH_version.rstrip() == "v2":
+                                # Append file choice
+                                filter_files.append({"name": filter_name.rstrip(),
+                                                     "value": full_filter_text,
+                                                     "selected": False
+                                                     })
+                        # Get ready to read next unknown txt file
+                        filter_WYH_version = ""
+                        filter_name = ""
+                        filter_comment = ""
+                        filter_desc = ""
+                        filter_arg = ""
+
+                    # Add filter file choice (only two entries supported)
+                    source_folder_name = [_("Effects"), _("Project's Folder")]
+                    self.choices.append({"name": source_folder_name[i], "value": filter_files, "selected": False})
 
             # Handle reader type values
             if self.property_type == "reader" and not self.choices:
