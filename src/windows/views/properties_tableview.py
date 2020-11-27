@@ -104,9 +104,9 @@ class PropertyDelegate(QItemDelegate):
                 painter.setBrush(QBrush(QColor("#3e3e3e")))
 
         if readonly:
-            # Set text color for read only fields
+            # Set text color for read only fields ("float", "int", like Duration)
             painter.setPen(QPen(get_app().window.palette().color(QPalette.Disabled, QPalette.Text)))
-        else:
+        elif property_type != "string":
             path = QPainterPath()
             path.addRoundedRect(QRectF(option.rect), 15, 15)
             painter.fillPath(path, QColor("#3e3e3e"))
@@ -140,6 +140,13 @@ class PropertyDelegate(QItemDelegate):
             painter.setPen(QPen(Qt.white))
 
         value = index.data(Qt.DisplayRole)
+        if property_type == "string":
+            if readonly:
+                # Set text color for read only fields ("string", like ID)
+                painter.setPen(QPen(get_app().window.palette().color(QPalette.Disabled, QPalette.Text)))
+            else:
+                painter.setPen(QPen(get_app().window.palette().color(QPalette.Normal, QPalette.Text)))
+
         if value:
             painter.drawText(option.rect, Qt.AlignCenter, value)
 
