@@ -1,0 +1,5 @@
+v2
+Rotate
+Rotetes image on P_1 degrees.
+, rotate=P_1*PI/180:fillcolor=none , buffersink
+~

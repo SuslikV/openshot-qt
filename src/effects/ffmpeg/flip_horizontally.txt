@@ -1,0 +1,5 @@
+v1
+Mirror
+Flips image horizontally.
+, hflip , buffersink
+~

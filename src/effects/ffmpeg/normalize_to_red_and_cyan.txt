@@ -1,0 +1,5 @@
+v1
+Normalize B/W to Red/Cyan
+Shifs black pont to red, white pont to cyan.
+, normalize=blackpt=0xFF0000:whitept=0x00FFFF , buffersink
+~

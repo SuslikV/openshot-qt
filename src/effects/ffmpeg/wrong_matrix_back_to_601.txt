@@ -1,0 +1,5 @@
+v1
+Wrong matrix (back to BT.601)
+Applies color corrections to enhance green in actually BT.601 footage, when BT.709 matrix was mistenkenly applied.
+[in_1]; movie=./effects/ffmpeg/lut/ffmpeg_clut_rgba_back_to_601_enhance_green.png , [in_1] haldclut , buffersink
+~

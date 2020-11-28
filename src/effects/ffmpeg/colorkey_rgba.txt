@@ -1,0 +1,5 @@
+v1
+Colorkey
+Replaces green color with transparency.
+, colorkey=color=0x3BBD1E:similarity=0.3:blend=0.2 , buffersink
+~

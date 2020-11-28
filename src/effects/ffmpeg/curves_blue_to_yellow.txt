@@ -1,0 +1,5 @@
+v1
+Curves (blue to yellow)
+Adjusts gamma curves per component. Shifts blue to yellow color.
+, curves=r='0/0.067 0.247/0.247 0.796/1':g='0/0.028 0.247/0.247 0.914/1':b='0/0 1/1', buffersink
+~

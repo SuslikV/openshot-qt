@@ -1,0 +1,5 @@
+v1
+Exposure -20
+Makes image darker.
+[in_1]; movie=./effects/ffmpeg/lut/ffmpeg_clut_rgba_exposure-20.png , [in_1] haldclut , buffersink
+~

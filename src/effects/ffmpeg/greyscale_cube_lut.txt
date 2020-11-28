@@ -1,0 +1,5 @@
+v1
+Greyscale (.CUBE lut)
+Removes color info from the image.
+, lut3d=./effects/ffmpeg/lut/grayscale.cube , buffersink
+~

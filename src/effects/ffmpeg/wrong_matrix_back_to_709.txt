@@ -1,0 +1,5 @@
+v1
+Wrong matrix (back to BT.709)
+Applies color corrections to reduce green in actually BT.709 footage, when BT.601 matrix was mistenkenly applied.
+[in_1]; movie=./effects/ffmpeg/lut/ffmpeg_clut_rgba_back_to_709_reduce_green.png , [in_1] haldclut , buffersink
+~

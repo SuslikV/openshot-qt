@@ -1,0 +1,5 @@
+v1
+Upside down
+Flips image vertically. (vflip returns negative linesize, double flip it to normalize)
+, vflip, hflip, hflip , buffersink
+~

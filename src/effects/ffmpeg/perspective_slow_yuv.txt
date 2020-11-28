@@ -1,0 +1,5 @@
+v2
+Perspective (slow)
+Adjusts perspective by P_1, P_2, P_3, P_4 percentage.
+, perspective=W*P_1*0.01:H*P_3*0.01:W-W*P_1*0.01:H*P_4*0.01:W*P_2*0.01:H-H*P_3*0.01:W-W*P_2*0.01:H-H*P_4*0.01:sense=0 , scale=out_range=pc , format=rgba, buffersink
+~

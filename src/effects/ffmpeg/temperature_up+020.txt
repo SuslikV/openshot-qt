@@ -1,0 +1,5 @@
+v1
+Temperature +20
+Shifts color temperature to warm the colors.
+[in_1]; movie=./effects/ffmpeg/lut/ffmpeg_clut_rgba_temperature+20.png , [in_1] haldclut , buffersink
+~

@@ -1,0 +1,5 @@
+v1
+WB yellow to blue
+White point moved from yellow to blue. Making image cold.
+[in_1]; movie=./effects/ffmpeg/lut/ffmpeg_clut_rgba_white_balance_make_cold.png , [in_1] haldclut , buffersink
+~
