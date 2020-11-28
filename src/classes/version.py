@@ -34,8 +34,8 @@ import json
 
 def get_current_Version():
     """Get the current version """
-    t = threading.Thread(target=get_version_from_http)
-    t.start()
+    #t = threading.Thread(target=get_version_from_http)
+    #t.start()
 
 def get_version_from_http():
     """Get the current version # from openshot.org"""

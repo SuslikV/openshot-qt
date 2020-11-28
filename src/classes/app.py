@@ -90,7 +90,7 @@ class OpenShotApp(QApplication):
         # Log some basic system info
         try:
             log.info("------------------------------------------------")
-            log.info(("OpenShot (version %s)" % info.SETUP['version']).center(48))
+            log.info(("OpenShotWYH (version %s)" % info.SETUP['version']).center(48))
             log.info("------------------------------------------------")
 
             log.info("openshot-qt version: %s" % info.VERSION)

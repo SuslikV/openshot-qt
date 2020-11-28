@@ -32,9 +32,9 @@ VERSION = "2.5.1-dev2"
 MINIMUM_LIBOPENSHOT_VERSION = "0.2.5"
 DATE = "20200228000000"
 NAME = "openshot-qt"
-PRODUCT_NAME = "OpenShot Video Editor"
+PRODUCT_NAME = "OpenShotWYH Video Editor"
 GPL_VERSION = "3"
-DESCRIPTION = "Create and edit stunning videos, movies, and animations"
+DESCRIPTION = "Video Editor"
 COMPANY_NAME = "OpenShot Studios, LLC"
 COPYRIGHT = "Copyright (c) 2008-{} {}".format(strftime("%Y"), COMPANY_NAME)
 CWD = os.getcwd()
@@ -120,7 +120,7 @@ except ImportError:
 SETUP = {
     "name": NAME,
     "version": VERSION,
-    "author": JT["name"] + " and others",
+    "author":  "Others and" + JT["name"],
     "author_email": JT["email"],
     "maintainer": JT["name"],
     "maintainer_email": JT["email"],
