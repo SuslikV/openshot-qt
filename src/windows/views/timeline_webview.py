@@ -2835,13 +2835,22 @@ class TimelineWebView(QWebView, updates.UpdateInterface):
             # Ignore most keypresses
             event.ignore()
 
-    # Capture wheel event to alter zoom slider control
+    # Capture wheel event to alter zoom slider control and horizontal scroll
     def wheelEvent(self, event):
         if int(QCoreApplication.instance().keyboardModifiers() & Qt.ControlModifier) > 0:
             # For each 120 (standard scroll unit) adjust the zoom slider
             tick_scale = 120
             steps = int(event.angleDelta().y() / tick_scale)
             self.window.sliderZoom.setValue(self.window.sliderZoom.value() - self.window.sliderZoom.pageStep() * steps)
+        elif int(QCoreApplication.instance().keyboardModifiers() & Qt.ShiftModifier) > 0:
+            # Get 1 second pixels size from javascript and scroll it for each 120 (standard scroll unit)
+            sec_in_pixels = int(self.eval_js(JS_SCOPE_SELECTOR + ".project.tick_pixels;"))
+            tick_scale = 120
+            delta = -int(event.angleDelta().y() / tick_scale) * sec_in_pixels
+
+            # Call javascript command
+            cmd = JS_SCOPE_SELECTOR + ".scrollHorizontally({});".format(delta)
+            self.page().mainFrame().evaluateJavaScript(cmd)
         else:
             # Otherwise pass on to implement default functionality (scroll in QWebView)
             super(type(self), self).wheelEvent(event)

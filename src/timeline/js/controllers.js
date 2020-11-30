@@ -459,7 +459,16 @@ App.controller('TimelineCtrl',function($scope) {
 	 var new_cursor_x = Math.round((cursor_time * $scope.pixelsPerSecond) - center_x);
 	 $("#scrolling_tracks").scrollLeft(new_cursor_x);
  };
- 
+
+  // Horizontal timeline scroll
+  $scope.scrollHorizontally = function(value) {
+    // Get scrollbar positions
+    var horz_scroll_offset = $("#scrolling_tracks").scrollLeft();
+
+    // Scroll the timeline using JQuery
+    $("#scrolling_tracks").scrollLeft(horz_scroll_offset + value);
+  };
+
  // Center the timeline on a given time position
  $scope.centerOnTime = function(centerTime) {
     // Get the width of the timeline
