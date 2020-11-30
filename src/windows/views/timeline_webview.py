@@ -3156,24 +3156,25 @@ class TimelineWebView(QWebView, updates.UpdateInterface):
     def render_cache_json(self):
         """Render the cached frames to the timeline (called every X seconds), and only if changed"""
 
-        # Get final cache object from timeline
-        try:
-            cache_object = get_app().window.timeline_sync.timeline.GetCache()
-            if cache_object and cache_object.Count() > 0:
-                # Get the JSON from the cache object (i.e. which frames are cached)
-                cache_json = get_app().window.timeline_sync.timeline.GetCache().Json()
-                cache_dict = json.loads(cache_json)
-                cache_version = cache_dict["version"]
+        if get_app().window.timeline_sync.timeline:
+            # Get final cache object from timeline
+            try:
+                cache_object = get_app().window.timeline_sync.timeline.GetCache()
+                if cache_object and cache_object.Count() > 0:
+                    # Get the JSON from the cache object (i.e. which frames are cached)
+                    cache_json = get_app().window.timeline_sync.timeline.GetCache().Json()
+                    cache_dict = json.loads(cache_json)
+                    cache_version = cache_dict["version"]
 
-                if self.cache_renderer_version != cache_version:
-                    # Cache has changed, re-render it
-                    self.cache_renderer_version = cache_version
+                    if self.cache_renderer_version != cache_version:
+                        # Cache has changed, re-render it
+                        self.cache_renderer_version = cache_version
 
-                    cmd = JS_SCOPE_SELECTOR + ".RenderCache({});".format(cache_json)
-                    self.page().mainFrame().evaluateJavaScript(cmd)
-        finally:
-            # ignore any errors inside the cache rendering
-            pass
+                        cmd = JS_SCOPE_SELECTOR + ".RenderCache({});".format(cache_json)
+                        self.page().mainFrame().evaluateJavaScript(cmd)
+            finally:
+                # ignore any errors inside the cache rendering
+                pass
 
     def __init__(self, window):
         QWebView.__init__(self)
