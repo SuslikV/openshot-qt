@@ -48,7 +48,7 @@ EXPORT_PRESETS_PATH = os.path.join(PATH, "presets")
 
 # User paths
 HOME_PATH = os.path.join(os.path.expanduser("~"))
-USER_PATH = os.path.join(HOME_PATH, ".openshot_qt")
+USER_PATH = os.path.join(HOME_PATH, "openshot_qt_wyh")
 BACKUP_PATH = os.path.join(USER_PATH)
 RECOVERY_PATH = os.path.join(USER_PATH, "recovery")
 THUMBNAIL_PATH = os.path.join(USER_PATH, "thumbnail")
