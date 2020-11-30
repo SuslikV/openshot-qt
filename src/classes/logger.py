@@ -59,7 +59,10 @@ formatter = logging.Formatter('%(module)12s:%(levelname)s %(message)s')
 
 # Get logger instance & set level
 log = logging.getLogger('OpenShot')
-log.setLevel(logging.INFO)
+if os.path.isfile(os.path.join(info.USER_PATH, 'no_log_mode.txt')) or os.path.isfile(os.path.join(info.PATH, 'no_log_mode.txt')):
+    log.setLevel(logging.CRITICAL)
+else:
+    log.setLevel(logging.INFO)
 
 # Add rotation file handler
 fh = RotatingFileHandler(

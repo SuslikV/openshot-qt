@@ -1,0 +1,3 @@
+rename/remove this file to make the OpenShot do log again.
+Same file may be placed in the USER folder next to "openshot.settings" file.
+Default name is "no_log_mode.txt"
